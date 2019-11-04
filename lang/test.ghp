@@ -1,1 +1,3 @@
-print("Hello, world!");
+a = 5;
+b = 91;
+c = b / a;
