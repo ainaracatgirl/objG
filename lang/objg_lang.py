@@ -1,7 +1,40 @@
-import sys
-import re
-import inspect
+import sys, os, re, inspect
 
+COMPILER_INPUT = None
+
+# BUILT-IN FUNCTIONS
+def builtin_print(env, value):
+    print(eval_expr(value, env)[1])
+    return eval_expr(value, env)
+
+def builtin_str(env, value):
+    return str(eval_expr(value, env)[1])
+
+def builtin_import(env, value):
+    f = open(str(eval_expr(value, env)[1]))
+    ff = f.read()
+    f.close()
+    toks = tokenize(ff)
+    tree = parse(toks)
+    evaluate(tree, env)
+    return ("none",)
+
+def builtin_if(env, condition, when_true, when_false):
+    condition = eval_expr(condition, env)[1]
+    if condition == 1:
+        eval_expr(("call", when_true, ()), env)
+    else:
+        eval_expr(("call", when_false, ()), env)
+    return ("none",)
+
+def builtin_equals(env, value1, value2):
+    value1 = eval_expr(value1, env)[1]
+    value2 = eval_expr(value2, env)[1]
+    if value1 == value2:
+        return ("number", 1)
+    return ("number", 0)
+
+# CODE
 class PeekableStream:
     def __init__(self, iterator):
         self.iterator = iter(iterator)
@@ -49,6 +82,8 @@ def tokenize(text):
             yield ("number", _scan(c, chars, "[.0-9]"))
         elif re.match("[_a-zA-Z0-9]", c):
             yield ("symbol", _scan(c, chars, "[_a-zA-Z0-9]"))
+        elif c in "#":
+            _scan_string("\n", chars)
         else: raise Exception("Unknown character '%s'" % c)
 
 class Parser():
@@ -110,7 +145,7 @@ class Parser():
             args = self.multi_exprs(",", ")")
             return self.next_expr(("call", prev, args))
         elif typ == "{":
-            params = self.parameter_list()
+            params = self.parameters_list()
             body = self.multi_exprs(";", "}")
             return self.next_expr(("function", params, body))
         elif typ == "=":
@@ -133,6 +168,15 @@ class Env:
     def __init__(self, parent=None):
         self.parent = parent
         self.items = {}
+        
+        self.set("print",   ("native", builtin_print))
+        self.set("str",     ("native", builtin_str))
+        self.set("import",  ("native", builtin_import))
+        self.set("if",      ("native", builtin_if))
+        self.set("equals",  ("native", builtin_equals))
+        self.set("true",    ("number",1.0))
+        self.set("false",   ("number",0.0))
+        self.set("None",    ("none",))
 
     def get(self, name):
         if name in self.items:
@@ -149,12 +193,27 @@ class Env:
             self.parent.items[name] = value
         else:
             self.items[name] = value
+    
+    def merge(self, other, replace=False):
+        if replace:
+            for item in other.items:
+                set(item, other.items[item])
+        else:
+            for item in other.items:
+                if item not in self.items:
+                    set(item, other.items[item])
 
-def fail_if_wrong_number_of_args(fn_name, params, args):
-    if len(params) != len(args):
-        raise Exception((
-            "%d arguments passed to function %s, but %d required."
-        ) % (len(args), fn_name, len(params)))
+def fail_if_wrong_number_of_args(fn_name, params, args, diff=0):
+    if diff == 1:
+        if len(params) - len(args) == -1:
+            raise Exception((
+                "%d arguments passed to function %s, but %d required."
+            ) % (len(args), fn_name, len(params) - 1))
+    else:
+        if len(params) != len(args):
+            raise Exception((
+                "%d arguments passed to function %s, but %d required."
+            ) % (len(args), fn_name, len(params)))
 
 def _function_call(expr, env):
     fn = eval_expr(expr[1], env)
@@ -170,8 +229,8 @@ def _function_call(expr, env):
         return eval_list(body, new_env)
     elif fn[0] == "native":
         py_fn = fn[1]
-        params = inspect.getargspec(py_fn).args
-        fail_if_wrong_number_of_args(expr[1], params, args)
+        params = inspect.getfullargspec(py_fn).args
+        fail_if_wrong_number_of_args(expr[1], params, args, diff=1)
         return fn[1](env, *args)
     else:
         raise Exception("Tried to call something that was not a function")
@@ -225,7 +284,7 @@ def eval_list(exprs, env):
     return ret
 
 def evaluate(tree, env):
-    print(list(eval_list(tree, env)))
+    eval_list(tree, env)
 
 if __name__ == '__main__':
     env = Env()
@@ -237,5 +296,12 @@ if __name__ == '__main__':
             f.close()
 
             toks = tokenize(text)
+            tree = parse(toks)
+            evaluate(tree, env)
+        elif sys.argv[1] == '--compile':
+            raise NotImplementedError("Compiling is not supported yet!")
+    else:
+        if COMPILER_INPUT is not None:
+            toks = tokenize(COMPILER_INPUT)
             tree = parse(toks)
             evaluate(tree, env)

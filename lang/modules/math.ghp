@@ -1,0 +1,2 @@
+math_square = {@(x) x * x; };
+math_invert = {@(x) x * -1; };
