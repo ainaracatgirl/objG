@@ -1,4 +1,4 @@
-import sys, os, re, inspect
+import sys, os, re, inspect, json, base64
 
 COMPILER_INPUT = None
 
@@ -305,15 +305,40 @@ if __name__ == '__main__':
 
     if len(sys.argv) > 1:
         if sys.argv[1] == '--run':
+            if sys.argv[2].endswith(".bin"):
+                f = open(sys.argv[2], 'rb')
+                text = f.read()
+                f.close()
+
+                decoded = base64.b85decode(text).decode('utf-8')
+                tree = json.loads(decoded)
+                evaluate(tree, env)
+            else:
+                f = open(sys.argv[2], 'r')
+                text = f.read()
+                f.close()
+
+                toks = tokenize(text)
+                tree = parse(toks)
+                evaluate(tree, env)
+        elif sys.argv[1] == '--compile':
+            print("Reading source code...")
             f = open(sys.argv[2], 'r')
             text = f.read()
             f.close()
 
+            print("Extracting tokens...")
             toks = tokenize(text)
+            print("Generatring AST...")
             tree = parse(toks)
-            evaluate(tree, env)
-        elif sys.argv[1] == '--compile':
-            raise NotImplementedError("Compiling is not supported yet!")
+            print("Converting to bytes...")
+            _json = json.dumps(list(tree))
+            encoded = base64.b85encode(_json.encode('utf-8'))
+            print("Writing bytes...")
+            f = open(sys.argv[2].split('.')[0] + '.bin', 'wb')
+            f.write(encoded)
+            f.close()
+            print("Finished!")
     else:
         if COMPILER_INPUT is not None:
             toks = tokenize(COMPILER_INPUT)
