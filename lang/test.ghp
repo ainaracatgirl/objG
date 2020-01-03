@@ -11,4 +11,9 @@ print(c);
 print("Printing a function: ");
 print(math_square(2));
 
-if(equals(c, 18.2), { print("YES!"); }, { print("NO!"); });
+if(equals(c, 18.2), {
+    print("Like normal, c is 18.2");
+}, {
+    print("No! How is that possible?");
+});
+

@@ -27,6 +27,11 @@ def builtin_if(env, condition, when_true, when_false):
         eval_expr(("call", when_false, ()), env)
     return ("none",)
 
+def builtin_while(env, condition, statement):
+    while eval_expr(condition, env)[1] == 1:
+        eval_expr(("call", statement, ()), env)
+    return ("none",)
+
 def builtin_equals(env, value1, value2):
     value1 = eval_expr(value1, env)[1]
     value2 = eval_expr(value2, env)[1]
@@ -173,10 +178,19 @@ class Env:
         self.set("str",     ("native", builtin_str))
         self.set("import",  ("native", builtin_import))
         self.set("if",      ("native", builtin_if))
+        self.set("while",   ("native", builtin_while))
         self.set("equals",  ("native", builtin_equals))
-        self.set("true",    ("number",1.0))
-        self.set("false",   ("number",0.0))
+        self.set("true",    ("number", 1.0))
+        self.set("false",   ("number", 0.0))
         self.set("None",    ("none",))
+
+    def has(self, name):
+        if name in self.items:
+            return True
+        elif self.parent is not None:
+            return self.parent.has(name)
+        else:
+            return False
 
     def get(self, name):
         if name in self.items:
@@ -189,8 +203,8 @@ class Env:
     def set(self, name, value):
         if name in self.items:
             self.items[name] = value
-        elif self.parent is not None and name in self.parent.items:
-            self.parent.items[name] = value
+        elif self.parent is not None and self.parent.has(name):
+            self.parent.set(name, value)
         else:
             self.items[name] = value
     
@@ -223,7 +237,7 @@ def _function_call(expr, env):
         fail_if_wrong_number_of_args(expr[1], params, args)
         body = fn[2]
         fn_env = fn[3]
-        new_env = Env(fn_env)
+        new_env = Env(parent=fn_env)
         for p, a in zip(params, args):
             new_env.set(p[1], a)
         return eval_list(body, new_env)
@@ -268,7 +282,7 @@ def eval_expr(expr, env):
     elif typ == "call":
         return _function_call(expr, env)
     elif typ == "function":
-        return ("function", expr[1], expr[2], Env(env))
+        return ("function", expr[1], expr[2], Env(parent=env))
     else:
         raise Exception("Unknown expression type: %s" % typ)
 
