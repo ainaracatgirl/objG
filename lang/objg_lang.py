@@ -1,14 +1,48 @@
-import sys, os, re, inspect, json, base64
+import sys, os, re, inspect, json, base64, threading, tkinter, time
 
 COMPILER_INPUT = None
+ADDON_SETS = []
+ENVs = []
+
+def AddAddonObject(obj):
+    ADDON_SETS.append(obj)
+    for env in ENVs:
+        env.updateAddons()
+
+def AddAddonFunction(name, func):
+    AddAddonObject((name, ("native", func)))
+
+def RunFunction(func_name, env, args=[]):
+    _function_call(('call', ('symbol', func_name), args), env)
 
 # BUILT-IN FUNCTIONS
 def builtin_print(env, value):
     print(eval_expr(value, env)[1])
     return eval_expr(value, env)
 
+def builtin_print_raw(env, value):
+    print(value)
+    return eval_expr(value, env)
+
 def builtin_str(env, value):
     return str(eval_expr(value, env)[1])
+
+def builtin_concat(env, a, b):
+    return ('string', str(eval_expr(a, env)[1]) + str(eval_expr(b, env)[1]))
+
+def builtin_library(env, value):
+    f = open(str(eval_expr(value, env)[1]), 'rb')
+    text = f.read()
+    f.close()
+
+    decoded = base64.b85decode(text).decode('utf-8')
+    exec(decoded)
+    return ("none",)
+
+def builtin_library_raw(env, value):
+    decoded = base64.b85decode(str(eval_expr(value, env)[1])).decode('utf-8')
+    exec(decoded)
+    return ("none",)
 
 def builtin_import(env, value):
     f = open(str(eval_expr(value, env)[1]))
@@ -80,7 +114,7 @@ def tokenize(text):
         c = chars.move_next()
         if c in " \n": pass
         elif c in "+-*/": yield ("operation", c)
-        elif c in "(){},;=@": yield (c, "")
+        elif c in "(){},;=:": yield (c, "")
         elif c in ("'", '"'):
             yield ("string", _scan_string(c, chars))
         elif re.match("[.0-9]", c):
@@ -101,12 +135,12 @@ class Parser():
             raise Exception("Hit end of file - expected '%s'." % expected)
 
     def parameters_list(self):
-        if self.tokens.next[0] != "@":
+        if self.tokens.next[0] != ":":
             return []
         self.tokens.move_next()
         typ = self.tokens.next[0]
         if typ != "(":
-            raise Exception("'@' must be followed by '(' in a function.")
+            raise Exception("':' must be followed by '(' in a function.")
         self.tokens.move_next()
         ret = self.multi_exprs(",", ")")
         for param in ret:
@@ -171,18 +205,28 @@ def parse(tokens):
 
 class Env:
     def __init__(self, parent=None):
+        ENVs.append(self)
         self.parent = parent
         self.items = {}
         
-        self.set("print",   ("native", builtin_print))
-        self.set("str",     ("native", builtin_str))
-        self.set("import",  ("native", builtin_import))
-        self.set("if",      ("native", builtin_if))
-        self.set("while",   ("native", builtin_while))
-        self.set("equals",  ("native", builtin_equals))
-        self.set("true",    ("number", 1.0))
-        self.set("false",   ("number", 0.0))
-        self.set("None",    ("none",))
+        self.set("print",       ("native", builtin_print))
+        self.set("str",         ("native", builtin_str))
+        self.set("concat",      ("native", builtin_concat))
+        self.set("import",      ("native", builtin_import))
+        self.set("library",     ("native", builtin_library))
+        self.set("library_raw", ("native", builtin_library_raw))
+        self.set("if",          ("native", builtin_if))
+        self.set("while",       ("native", builtin_while))
+        self.set("equals",      ("native", builtin_equals))
+        self.set("print_raw",   ("native", builtin_print_raw))
+        self.set("true",        ("number", 1.0))
+        self.set("false",       ("number", 0.0))
+        self.set("None",        ("none",))
+        self.updateAddons()
+
+    def updateAddons(self):
+        for addon in ADDON_SETS:
+            self.set(addon[0], addon[1])
 
     def has(self, name):
         if name in self.items:
@@ -336,6 +380,19 @@ if __name__ == '__main__':
             encoded = base64.b85encode(_json.encode('utf-8'))
             print("Writing bytes...")
             f = open(sys.argv[2].split('.')[0] + '.bin', 'wb')
+            f.write(encoded)
+            f.close()
+            print("Finished!")
+        elif sys.argv[1] == '--library':
+            print("Reading native code...")
+            f = open(sys.argv[2], 'r')
+            text = f.read()
+            f.close()
+
+            print("Converting to bytes...")
+            encoded = base64.b85encode(text.encode('utf-8'))
+            print("Writing bytes...")
+            f = open(sys.argv[2].split('.')[0] + '.lib', 'wb')
             f.write(encoded)
             f.close()
             print("Finished!")
