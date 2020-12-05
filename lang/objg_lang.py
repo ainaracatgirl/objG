@@ -396,8 +396,16 @@ if __name__ == '__main__':
             f.write(encoded)
             f.close()
             print("Finished!")
+        else:
+            print("--run FILE     | Runs a .ghp file or a compiled .bin file")
+            print("--compile FILE | Compiles a .ghp file into a .bin file")
+            print("--library FILE | Converts a python file into a .lib objG library")
     else:
         if COMPILER_INPUT is not None:
             toks = tokenize(COMPILER_INPUT)
             tree = parse(toks)
             evaluate(tree, env)
+        else:
+            print("--run FILE     | Runs a .ghp file or a compiled .bin file")
+            print("--compile FILE | Compiles a .ghp file into a .bin file")
+            print("--library FILE | Converts a python file into a .lib objG library")

@@ -1,0 +1,25 @@
+library("libraries/g2d.lib");
+
+id = g2d_create("dibujar", 640, 480, "Mi pantalla");
+g2d_background(id, "black");
+
+sprite = g2d_loadspr("sprite.png");
+
+x = 0.0;
+y = 40.0;
+
+dibujar = {:()
+    g2d_rect(id, 10, 10, 20, 20, "blue");
+    g2d_line(id, 10, 10, 30, 30, "red");
+    g2d_ellipse(id, x, y, 20, 20, "green");
+
+    g2d_sprite(id, 640 / 2, 480 / 2, sprite);
+
+    x = x + 0.5;
+    if(equals(x, 640), {
+        x = 0;
+        y = y + 5;
+    }, {});
+};
+
+g2d_start(id);

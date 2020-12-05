@@ -1,0 +1,9 @@
+library("libraries/g2d.lib");
+
+id = g2d_create("dibujar", 640, 480, "Mi pantalla");
+g2d_background(id, "black");
+
+dibujar = {
+};
+
+g2d_start(id);

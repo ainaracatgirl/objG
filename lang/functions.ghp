@@ -1,0 +1,7 @@
+cuadrado = {:(x)
+    x * x;
+};
+
+print(cuadrado(10));
+print(cuadrado(3));
+print(cuadrado(7));

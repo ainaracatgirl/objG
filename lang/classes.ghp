@@ -1,0 +1,23 @@
+Clase = {:(texto)
+    {:(accion)
+        ret = None;
+        if(equals(accion, "obtener"), {
+            ret = texto;
+        }, {
+            if(equals(accion, "establecer"), {
+                ret = {:(nuevo)
+                    texto = nuevo;
+                    texto;
+                };
+            }, {
+            });
+        });
+        ret;
+    };
+};
+
+hola = Clase("Hola");
+print(hola("obtener"));
+
+hola("establecer")("Hola mundo!");
+print(hola("obtener"));
